@@ -28,6 +28,14 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# sensitive configuration files
+set-anthropic-env.sh
+*.sh
+env.sh
+config.sh
+keys.sh
+secrets.sh
+
 # vercel
 .vercel
 
