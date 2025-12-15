@@ -4,56 +4,31 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { User, MapPin, CreditCard, Truck } from "lucide-react";
 
-const CheckoutForm = ({ 
-  onSubmit, 
-  isLoading, 
-  cartItems, 
-  cartTotals, 
-  shippingCost, 
+const CheckoutForm = ({
+  onSubmit,
+  isLoading,
+  cartItems,
+  cartTotals,
+  shippingCost,
   totalAmount,
-  initialData // 1. Menerima data user yang login
+  initialData,
+  currentStep,
+  onStepChange
 }) => {
   const [formData, setFormData] = useState({
-    // Contact Information
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-
-    // Billing Address
-    billingAddress: {
-      street: '',
-      city: '',
-      province: '',
-      postalCode: '',
-      country: 'Indonesia'
-    },
-
-    // Shipping Information
+    firstName: '', lastName: '', email: '', phone: '',
+    billingAddress: { street: '', city: '', province: '', postalCode: '', country: 'Indonesia' },
     shippingSameAsBilling: true,
-    shippingAddress: {
-      street: '',
-      city: '',
-      province: '',
-      postalCode: '',
-      country: 'Indonesia'
-    },
-
-    // Order Notes
+    shippingAddress: { street: '', city: '', province: '', postalCode: '', country: 'Indonesia' },
     orderNotes: '',
-
-    // Payment Method
-    paymentMethod: 'doku', // Default ke Doku
-    paymentMethodType: 'BCA', // Default Type
-
-    // Doku specific (opsional, disinkronkan dengan paymentMethodType)
+    paymentMethod: 'doku',
+    paymentMethodType: 'BCA', // Default
     dokuPaymentMethod: 'VIRTUAL_ACCOUNT',
     dokuPaymentType: 'BCA',
   });
 
   const [errors, setErrors] = useState({});
 
-  // 2. Auto-fill Form jika User Login
   useEffect(() => {
     if (initialData) {
       setFormData(prev => ({
@@ -62,423 +37,252 @@ const CheckoutForm = ({
         lastName: initialData.lastName || '',
         email: initialData.email || '',
         phone: initialData.phone || '',
-        // Jika user punya alamat tersimpan (misal dari profil), bisa di-map disini juga
       }));
     }
   }, [initialData]);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    // Clear error
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
+  const handleInputChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
   const handleAddressChange = (type, field, value) => {
     setFormData(prev => ({
-      ...prev,
-      [type]: {
-        ...prev[type],
-        [field]: value
-      }
+      ...prev, [type]: { ...prev[type], [field]: value }
     }));
   };
 
-  const handleShippingSameChange = (checked) => {
-    setFormData(prev => ({
-      ...prev,
-      shippingSameAsBilling: checked,
-      // Jika dicentang, salin billing ke shipping
-      shippingAddress: checked ? { ...prev.billingAddress } : prev.shippingAddress
-    }));
-  };
-
-  const validateForm = () => {
+  const validateInfoStep = () => {
     const newErrors = {};
-
-    // Contact validation
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
-    }
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-
-    // Billing address validation
-    if (!formData.billingAddress.street.trim()) newErrors['billing.street'] = 'Street address is required';
+    if (!formData.billingAddress.street.trim()) newErrors['billing.street'] = 'Address is required';
     if (!formData.billingAddress.city.trim()) newErrors['billing.city'] = 'City is required';
-    if (!formData.billingAddress.province.trim()) newErrors['billing.province'] = 'Province is required';
-    if (!formData.billingAddress.postalCode.trim()) newErrors['billing.postalCode'] = 'Postal code is required';
+    if (!formData.billingAddress.postalCode.trim()) newErrors['billing.postalCode'] = 'Postal Code is required';
 
-    // Shipping address validation (if different)
     if (!formData.shippingSameAsBilling) {
-      if (!formData.shippingAddress.street.trim()) newErrors['shipping.street'] = 'Street address is required';
-      if (!formData.shippingAddress.city.trim()) newErrors['shipping.city'] = 'City is required';
-      if (!formData.shippingAddress.province.trim()) newErrors['shipping.province'] = 'Province is required';
-      if (!formData.shippingAddress.postalCode.trim()) newErrors['shipping.postalCode'] = 'Postal code is required';
+      if (!formData.shippingAddress.street.trim()) newErrors['shipping.street'] = 'Address is required';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleDokuPaymentChange = (method, type) => {
-    setFormData(prev => ({
-      ...prev,
-      dokuPaymentMethod: method,
-      dokuPaymentType: type,
-      paymentMethod: 'doku',
-      paymentMethodType: type // Penting: Ini yang dikirim ke API
-    }));
-  };
-
-  const handlePaymentMethodChange = (method) => {
-    setFormData(prev => ({
-      ...prev,
-      paymentMethod: method,
-      // Reset type jika bukan doku, atau set default jika doku
-      paymentMethodType: method === 'doku' ? prev.dokuPaymentType || 'BCA' : ''
-    }));
-  };
-
-  // 3. Logic Submit Utama
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // Validasi Form
-    if (validateForm()) {
-      // Pastikan Shipping Address terisi benar sebelum kirim
-      const finalFormData = {
-        ...formData,
-        shippingAddress: formData.shippingSameAsBilling ? formData.billingAddress : formData.shippingAddress
-      };
-
-      // Panggil fungsi parent (CheckoutPage) untuk proses API
-      onSubmit(finalFormData);
+  const handleContinueToPayment = () => {
+    if (validateInfoStep()) {
+      onStepChange(2);
     } else {
-      // Scroll ke atas jika ada error
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-lg shadow-sm border p-6"
+  const handleReviewInfo = () => {
+    onStepChange(1);
+  };
+
+  const handleDokuPaymentSelection = (method, type) => {
+    setFormData(prev => ({
+      ...prev,
+      dokuPaymentMethod: method,
+      dokuPaymentType: type,
+      paymentMethodType: type
+    }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (validateInfoStep()) {
+      const finalFormData = {
+        ...formData,
+        shippingAddress: formData.shippingSameAsBilling ? formData.billingAddress : formData.shippingAddress
+      };
+      onSubmit(finalFormData);
+    }
+  };
+
+  // Helper for Payment Options
+  const PaymentOption = ({ label, method, type, icon }) => (
+    <div
+      onClick={() => handleDokuPaymentSelection(method, type)}
+      className={`relative p-4 border rounded-xl cursor-pointer transition-all duration-200 flex flex-col items-center justify-center gap-2 text-center h-28
+        ${formData.dokuPaymentType === type
+          ? 'border-black bg-gray-50 ring-1 ring-black shadow-sm'
+          : 'border-gray-200 hover:border-gray-400 hover:shadow-sm'}`}
     >
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Contact Information */}
-        <div>
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <User size={20} />
-            Contact Information
-          </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
-              <input
-                type="text"
-                value={formData.firstName}
-                onChange={(e) => handleInputChange('firstName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.firstName ? 'border-red-500' : 'border-gray-300'}`}
-                placeholder="John"
-                disabled={isLoading}
-              />
-              {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
-              <input
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => handleInputChange('lastName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.lastName ? 'border-red-500' : 'border-gray-300'}`}
-                placeholder="Doe"
-                disabled={isLoading}
-              />
-              {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
-                placeholder="john.doe@example.com"
-                disabled={isLoading}
-              />
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => handleInputChange('phone', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
-                placeholder="+62 812-3456-7890"
-                disabled={isLoading}
-              />
-              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-            </div>
-          </div>
+      <div className="text-2xl mb-1">{icon}</div>
+      <span className="text-sm font-medium leading-tight">{label}</span>
+      {formData.dokuPaymentType === type && (
+        <div className="absolute top-2 right-2 text-black">
+          <div className="w-2 h-2 rounded-full bg-black"></div>
         </div>
+      )}
+    </div>
+  );
 
-        {/* Billing Address */}
-        <div>
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <MapPin size={20} />
-            Billing Address
+  return (
+    <div className="space-y-6">
+
+      {/* STEP 1: INFORMATION */}
+      <motion.div
+        initial={false}
+        animate={currentStep === 1 ? "open" : "collapsed"}
+        className={`bg-white rounded-xl shadow-sm border overflow-hidden ${currentStep === 1 ? 'ring-1 ring-black/5' : 'opacity-60 grayscale-[0.5]'}`}
+      >
+        <div className="p-6 border-b flex justify-between items-center bg-gray-50/50">
+          <h2 className="text-lg font-medium flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-black text-white text-xs">1</span>
+            Contact & Shipping
           </h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Street Address *</label>
-              <input
-                type="text"
-                value={formData.billingAddress.street}
-                onChange={(e) => handleAddressChange('billingAddress', 'street', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.street'] ? 'border-red-500' : 'border-gray-300'}`}
-                placeholder="123 Main Street"
-                disabled={isLoading}
-              />
-              {errors['billing.street'] && <p className="text-red-500 text-sm mt-1">{errors['billing.street']}</p>}
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                <input
-                  type="text"
-                  value={formData.billingAddress.city}
-                  onChange={(e) => handleAddressChange('billingAddress', 'city', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.city'] ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Jakarta"
-                  disabled={isLoading}
-                />
-                {errors['billing.city'] && <p className="text-red-500 text-sm mt-1">{errors['billing.city']}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
-                <input
-                  type="text"
-                  value={formData.billingAddress.province}
-                  onChange={(e) => handleAddressChange('billingAddress', 'province', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.province'] ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="DKI Jakarta"
-                  disabled={isLoading}
-                />
-                {errors['billing.province'] && <p className="text-red-500 text-sm mt-1">{errors['billing.province']}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
-                <input
-                  type="text"
-                  value={formData.billingAddress.postalCode}
-                  onChange={(e) => handleAddressChange('billingAddress', 'postalCode', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.postalCode'] ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="12345"
-                  disabled={isLoading}
-                />
-                {errors['billing.postalCode'] && <p className="text-red-500 text-sm mt-1">{errors['billing.postalCode']}</p>}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Shipping Address */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Truck size={20} />
-            <h2 className="text-lg font-medium">Shipping Address</h2>
-          </div>
-
-          <label className="flex items-center gap-2 mb-4 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.shippingSameAsBilling}
-              onChange={(e) => handleShippingSameChange(e.target.checked)}
-              className="rounded border-gray-300 text-black focus:ring-black"
-              disabled={isLoading}
-            />
-            <span className="text-sm text-gray-700">Same as billing address</span>
-          </label>
-
-          {!formData.shippingSameAsBilling && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Street Address *</label>
-                <input
-                  type="text"
-                  value={formData.shippingAddress.street}
-                  onChange={(e) => handleAddressChange('shippingAddress', 'street', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.street'] ? 'border-red-500' : 'border-gray-300'}`}
-                  disabled={isLoading}
-                />
-                {errors['shipping.street'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.street']}</p>}
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                    <input type="text" value={formData.shippingAddress.city} onChange={(e) => handleAddressChange('shippingAddress', 'city', e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.city'] ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading}/>
-                    {errors['shipping.city'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.city']}</p>}
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
-                    <input type="text" value={formData.shippingAddress.province} onChange={(e) => handleAddressChange('shippingAddress', 'province', e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.province'] ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading}/>
-                    {errors['shipping.province'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.province']}</p>}
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
-                    <input type="text" value={formData.shippingAddress.postalCode} onChange={(e) => handleAddressChange('shippingAddress', 'postalCode', e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.postalCode'] ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading}/>
-                    {errors['shipping.postalCode'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.postalCode']}</p>}
-                </div>
-              </div>
-            </div>
+          {currentStep === 2 && (
+            <button onClick={handleReviewInfo} className="text-sm underline text-gray-600 hover:text-black">Edit</button>
           )}
         </div>
 
-        {/* Payment Method */}
-        <div>
-          <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-            <CreditCard size={20} />
-            Payment Method
-          </h2>
-
-          <div className="mb-6">
-            <div className="space-y-3">
-              <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${formData.paymentMethod === 'doku' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="doku"
-                  checked={formData.paymentMethod === 'doku'}
-                  onChange={(e) => handlePaymentMethodChange(e.target.value)}
-                  className="text-blue-600 focus:ring-blue-600"
-                  disabled={isLoading}
-                />
-                <div className="flex-1">
-                  <div className="font-medium text-blue-900">Secure Online Payment</div>
-                  <div className="text-sm text-blue-700">Virtual Account, E-Wallet, QR Code, Credit Card & More</div>
-                </div>
-                <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">Recommended</div>
-              </label>
-
-              {formData.paymentMethod === 'doku' && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="mt-4 pl-2 space-y-3"
-                >
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-                    <select
-                      value={formData.dokuPaymentMethod}
-                      onChange={(e) => handleDokuPaymentChange(e.target.value, formData.dokuPaymentType)}
-                      disabled={isLoading}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                    >
-                      <option value="VIRTUAL_ACCOUNT">Virtual Account</option>
-                      <option value="EWALLET">E-Wallet</option>
-                      <option value="QR_CODE">QR Code</option>
-                      <option value="CREDIT_CARD">Credit Card</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bank/Provider</label>
-                    <select
-                      value={formData.dokuPaymentType}
-                      onChange={(e) => handleDokuPaymentChange(formData.dokuPaymentMethod, e.target.value)}
-                      disabled={isLoading}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                    >
-                      {formData.dokuPaymentMethod === 'VIRTUAL_ACCOUNT' && (
-                        <>
-                          <option value="BCA">BCA Virtual Account</option>
-                          <option value="BNI">BNI Virtual Account</option>
-                          <option value="BRI">BRI Virtual Account</option>
-                          <option value="MANDIRI">Mandiri Virtual Account</option>
-                        </>
-                      )}
-                      {formData.dokuPaymentMethod === 'EWALLET' && (
-                        <>
-                          <option value="OVO">OVO</option>
-                          <option value="DANA">DANA</option>
-                          <option value="GOPAY">GoPay</option>
-                          <option value="LINKAJA">LinkAja</option>
-                        </>
-                      )}
-                      {formData.dokuPaymentMethod === 'QR_CODE' && (
-                        <>
-                          <option value="QRIS">QRIS</option>
-                        </>
-                      )}
-                      {formData.dokuPaymentMethod === 'CREDIT_CARD' && (
-                        <>
-                          <option value="VISA">Visa</option>
-                          <option value="MASTERCARD">Mastercard</option>
-                          <option value="JCB">JCB</option>
-                        </>
-                      )}
-                    </select>
-                  </div>
-                </motion.div>
-              )}
+        {/* Form Content - Collapsible */}
+        <div className={`${currentStep === 1 ? 'block' : 'hidden'} p-6 space-y-6`}>
+          {/* Contact Grid */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">First Name</label>
+              <input type="text" value={formData.firstName} onChange={e => handleInputChange('firstName', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10 transition-colors ${errors.firstName ? 'border-red-500' : 'border-gray-200'}`} placeholder="John" />
+              {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">Last Name</label>
+              <input type="text" value={formData.lastName} onChange={e => handleInputChange('lastName', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10 transition-colors ${errors.lastName ? 'border-red-500' : 'border-gray-200'}`} placeholder="Doe" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">Email</label>
+              <input type="email" value={formData.email} onChange={e => handleInputChange('email', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10 transition-colors ${errors.email ? 'border-red-500' : 'border-gray-200'}`} placeholder="john@example.com" />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">Phone</label>
+              <input type="tel" value={formData.phone} onChange={e => handleInputChange('phone', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10 transition-colors ${errors.phone ? 'border-red-500' : 'border-gray-200'}`} placeholder="+62..." />
             </div>
           </div>
-        </div>
 
-        {/* Order Notes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Order Notes (Optional)</label>
-          <textarea
-            value={formData.orderNotes}
-            onChange={(e) => handleInputChange('orderNotes', e.target.value)}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-            placeholder="Special instructions for delivery..."
-            disabled={isLoading}
-          />
-        </div>
+          {/* Address */}
+          <div className="space-y-4 pt-4 border-t">
+            <h3 className="font-medium text-sm text-gray-900">Shipping Address</h3>
+            <div>
+              <input type="text" value={formData.billingAddress.street} onChange={e => handleAddressChange('billingAddress', 'street', e.target.value)}
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10 transition-colors ${errors['billing.street'] ? 'border-red-500' : 'border-gray-200'}`} placeholder="Street Address" />
+              {errors['billing.street'] && <p className="text-red-500 text-xs mt-1">{errors['billing.street']}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <input type="text" value={formData.billingAddress.city} onChange={e => handleAddressChange('billingAddress', 'city', e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10" placeholder="City" />
+              <input type="text" value={formData.billingAddress.postalCode} onChange={e => handleAddressChange('billingAddress', 'postalCode', e.target.value)}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10" placeholder="Postal Code" />
+            </div>
+          </div>
 
-        {/* Submit Button */}
-        <div className="pt-4 border-t">
-          {/* Kita menggunakan tombol standard di sini agar form submit ter-trigger dengan benar */}
-          <button
-             type="submit"
-             disabled={isLoading}
-             className="w-full bg-black text-white py-4 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-             {isLoading ? (
-                 <>
-                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    Processing Order...
-                 </>
-             ) : (
-                 <>
-                    Place Order & Pay {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(totalAmount)}
-                    <CreditCard size={18} />
-                 </>
-             )}
+          <button type="button" onClick={handleContinueToPayment} className="w-full bg-black text-white py-4 rounded-xl font-medium hover:bg-zinc-800 transition-colors">
+            Continue to Payment
           </button>
         </div>
-      </form>
-    </motion.div>
+
+        {/* Summary View (When Collapsed) */}
+        {currentStep === 2 && (
+          <div className="px-6 pb-6 text-sm text-gray-600">
+            <p className="font-medium text-black">{formData.firstName} {formData.lastName}</p>
+            <p>{formData.email}</p>
+            <p className="truncate">{formData.billingAddress.street}, {formData.billingAddress.city}</p>
+          </div>
+        )}
+      </motion.div>
+
+
+      {/* STEP 2: PAYMENT */}
+      <motion.div
+        initial={false}
+        animate={currentStep === 2 ? "open" : "collapsed"}
+        className={`bg-white rounded-xl shadow-sm border overflow-hidden ${currentStep === 2 ? 'ring-1 ring-black/5' : 'opacity-40 pointer-events-none'}`}
+      >
+        <div className="p-6 border-b bg-gray-50/50">
+          <h2 className="text-lg font-medium flex items-center gap-2">
+            <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs ${currentStep === 2 ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
+            Payment Method
+          </h2>
+        </div>
+
+        {currentStep === 2 && (
+          <div className="p-6 space-y-6">
+
+            {/* Visual Payment Selection */}
+            <div className="space-y-6">
+              {/* Virtual Accounts */}
+              <div>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Virtual Account</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <PaymentOption label="BCA" method="VIRTUAL_ACCOUNT" type="BCA" icon="🏦" />
+                  <PaymentOption label="Mandiri" method="VIRTUAL_ACCOUNT" type="MANDIRI" icon="🏦" />
+                  <PaymentOption label="BNI" method="VIRTUAL_ACCOUNT" type="BNI" icon="🏦" />
+                  <PaymentOption label="BRI" method="VIRTUAL_ACCOUNT" type="BRI" icon="🏦" />
+                </div>
+              </div>
+
+              {/* E-Wallets */}
+              <div>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">E-Wallet & QRIS</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <PaymentOption label="QRIS" method="QR_CODE" type="QRIS" icon="📱" />
+                  <PaymentOption label="OVO" method="EWALLET" type="OVO" icon="👛" />
+                  <PaymentOption label="DANA" method="EWALLET" type="DANA" icon="👛" />
+                  <PaymentOption label="GoPay" method="EWALLET" type="GOPAY" icon="👛" />
+                </div>
+              </div>
+
+              {/* Credit Card */}
+              <div>
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Credit Card</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <PaymentOption label="Credit Card" method="CREDIT_CARD" type="CREDIT_CARD" icon="💳" />
+                </div>
+              </div>
+            </div>
+
+            {/* Secure Notice */}
+            <div className="bg-blue-50 text-blue-800 p-4 rounded-lg flex gap-3 text-sm items-start">
+              <User size={16} className="mt-0.5" />
+              <p>All transactions are secure and encrypted. You will be redirected to DOKU Safe Page to complete the payment.</p>
+            </div>
+
+            {/* Order Notes */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">Order Notes (Optional)</label>
+              <textarea
+                value={formData.orderNotes} onChange={e => handleInputChange('orderNotes', e.target.value)}
+                rows={2}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+                placeholder="Specific delivery instructions..."
+              />
+            </div>
+
+            <div className="pt-4 border-t">
+              <button
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className="w-full bg-black text-white py-4 rounded-xl font-medium hover:bg-zinc-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg shadow-lg shadow-black/10"
+              >
+                {isLoading ? (
+                  <span className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <>
+                    Pay {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(totalAmount)}
+                    <CreditCard size={20} />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+      </motion.div>
+    </div>
   );
 };
 
