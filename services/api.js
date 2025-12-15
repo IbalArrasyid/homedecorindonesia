@@ -21,7 +21,7 @@ export async function fetchJson(path) {
   return res.json();
 }
 
-export async function getBedsCategoryId(categorySlug, categoryName) {
+export async function getCategoryId(categorySlug, categoryName) {
   let cats = await fetchJson(`/products/categories?slug=${categorySlug}&per_page=1`);
   if (Array.isArray(cats) && cats[0]?.id) return cats[0].id;
 
@@ -40,7 +40,7 @@ export async function getBedsCategoryId(categorySlug, categoryName) {
 
 export async function getProducts(categorySlug, categoryName, numberPerPage) {
   try {
-    const categoryId = await getBedsCategoryId(categorySlug, categoryName);
+    const categoryId = await getCategoryId(categorySlug, categoryName);
     const data = await fetchJson(`/products?category=${categoryId}&per_page=${numberPerPage}`)
 
     return {

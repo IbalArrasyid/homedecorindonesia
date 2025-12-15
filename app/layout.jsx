@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import WhatsAppFloating from "@/components/WhatsappFloating";
 import BottomNavigation from "@/components/BottomNavigation";
+import { AuthProvider } from "@/hooks/useAuth";
 
 const futuraBook = localFont({
   src: './fonts/Futura-Book.ttf',
@@ -47,11 +48,13 @@ export default function RootLayout({ children }) {
         className={`${futuraBook.variable} antialiased`}
       >
         <Theme>
-          <Header />
-          {children}
-          <WhatsAppFloating />
-          <BottomNavigation />
-          <Footer />
+          <AuthProvider>
+            <Header />
+            {children}
+            <WhatsAppFloating />
+            <BottomNavigation />
+            <Footer />
+          </AuthProvider>
         </Theme>
       </body>
     </html>

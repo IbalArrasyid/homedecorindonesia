@@ -4,152 +4,199 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useCart } from "@/hooks/useCart";
+import { useAuth } from "@/hooks/useAuth"; // 1. Import Auth Hook
 import CheckoutForm from "@/components/Checkout/CheckoutForm";
 import OrderSummary from "@/components/Checkout/OrderSummary";
-import { wooCheckout } from "@/lib/woocommerceCheckout";
-import { Shield, Truck, Clock, ArrowRight, ShoppingBag, CreditCard } from "lucide-react";
+import DokuCheckout from "@/components/Checkout/DokuCheckout";
+import { Shield, Truck, Clock, ShoppingBag } from "lucide-react";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { cartItems, getCartTotals, getShippingCost, clearCart } = useCart();
+  const { getToken, user } = useAuth(); // 2. Ambil helper Token & User
+  
   const [isLoading, setIsLoading] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderData, setOrderData] = useState(null);
+  const [cartReady, setCartReady] = useState(false);
+
+  // DOKU Checkout states
+  const [showDokuCheckout, setShowDokuCheckout] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const cartTotals = getCartTotals();
   const shippingCost = getShippingCost();
   const totalAmount = cartTotals.subtotal + shippingCost;
 
-  // Debug: Log cart data
-  console.log('=== CHECKOUT PAGE DEBUG ===');
-  console.log('Cart Items:', cartItems);
-  console.log('Cart Items Length:', cartItems.length);
-  console.log('Cart Totals:', cartTotals);
-  console.log('LocalStorage Cart:', localStorage.getItem('homedecor_cart'));
-  console.log('=== END CHECKOUT DEBUG ===');
+  // Mark cart as ready after hydration
+  useEffect(() => {
+    setCartReady(true);
+  }, []);
 
   // Redirect to cart if empty
   useEffect(() => {
-    console.log('Checking if cart is empty:', cartItems.length === 0, 'orderPlaced:', orderPlaced);
+    if (!cartReady) return;
     if (cartItems.length === 0 && !orderPlaced) {
-      console.log('Redirecting to cart because cart is empty');
-      // Add a small delay to allow debugging
-      setTimeout(() => {
-        router.push('/cart');
-      }, 1000);
+      router.push('/cart');
     }
-  }, [cartItems.length, orderPlaced, router]);
+  }, [cartReady, cartItems.length, orderPlaced, router]);
 
+  // 3. Logic Utama Submit Order
   const handleOrderSubmit = async (formData) => {
     setIsLoading(true);
-
+    
     try {
-      console.log('=== WOOCOMMERCE ORDER SUBMISSION ===');
-      console.log('Form data:', formData);
-      console.log('Cart items:', cartItems);
-      console.log('Cart totals:', cartTotals);
-      console.log('Shipping cost:', shippingCost);
-      console.log('Total amount:', totalAmount);
-      console.log('=== END WOOCOMMERCE DEBUG ===');
+      // A. Ambil Token
+      const token = getToken();
+      
+      // B. Siapkan Payload sesuai yang dibutuhkan API
+      const payload = {
+        // Data items dari cart
+        items: cartItems.map(item => ({
+          product_id: item.id,
+          quantity: item.quantity
+        })),
 
-      // Validate order data
-      const validation = wooCheckout.validateOrderData({
-        ...formData,
-        items: cartItems
-      });
+        // Data customer sesuai format WooCommerce
+        customer: {
+          billing: {
+            first_name: formData.firstName || '',
+            last_name: formData.lastName || '',
+            email: formData.email || '',
+            phone: formData.phone || '',
+            address_1: formData.billingAddress.street || '',
+            city: formData.billingAddress.city || '',
+            state: formData.billingAddress.province || '',
+            postcode: formData.billingAddress.postalCode || '',
+            country: formData.billingAddress.country || 'Indonesia'
+          },
+          shipping: formData.shippingSameAsBilling ?
+            {
+              first_name: formData.firstName || '',
+              last_name: formData.lastName || '',
+              email: formData.email || '',
+              phone: formData.phone || '',
+              address_1: formData.billingAddress.street || '',
+              city: formData.billingAddress.city || '',
+              state: formData.billingAddress.province || '',
+              postcode: formData.billingAddress.postalCode || '',
+              country: formData.billingAddress.country || 'Indonesia'
+            } : {
+              first_name: formData.firstName || '',
+              last_name: formData.lastName || '',
+              email: formData.email || '',
+              phone: formData.phone || '',
+              address_1: formData.shippingAddress.street || '',
+              city: formData.shippingAddress.city || '',
+              state: formData.shippingAddress.province || '',
+              postcode: formData.shippingAddress.postalCode || '',
+              country: formData.shippingAddress.country || 'Indonesia'
+            }
+        },
 
-      if (!validation.isValid) {
-        throw new Error(validation.errors.join(', '));
-      }
+        // Payment method info
+        paymentMethod: formData.paymentMethod || 'doku',
+        dokuPaymentMethod: formData.dokuPaymentMethod || 'VIRTUAL_ACCOUNT',
+        dokuPaymentType: formData.dokuPaymentType || 'BCA',
 
-      // Prepare WooCommerce order data
-      const wooOrderData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        billingAddress: formData.billingAddress,
-        shippingSameAsBilling: formData.shippingSameAsBilling,
-        shippingAddress: formData.shippingAddress,
-        items: cartItems,
-        totals: cartTotals,
+        // Additional data
         shippingCost: shippingCost,
-        total: totalAmount,
-        paymentMethod: formData.paymentMethod,
-        orderNotes: formData.orderNotes
+        orderNotes: formData.orderNotes || ''
       };
 
-      // Create order in WooCommerce
-      const orderResult = await wooCheckout.createOrder(wooOrderData);
+      console.log("📤 Submitting Order Payload:", payload);
 
-      if (!orderResult.success) {
-        throw new Error(orderResult.error || 'Failed to create order in WooCommerce');
+      // C. Siapkan Headers
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      // D. LAMPIRKAN TOKEN JIKA ADA (Kunci Integrasi Login)
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log('WooCommerce order created successfully:', orderResult);
-
-      // Process payment if needed
-      let paymentResult = null;
-      if (formData.paymentMethod !== 'bank_transfer' && formData.paymentMethod !== 'cod') {
-        paymentResult = await wooCheckout.processPayment({
-          ...orderResult,
-          paymentMethod: formData.paymentMethod,
-          total: totalAmount
-        }, {});
-      }
-
-      // Set order data for confirmation page
-      setOrderData({
-        ...orderResult.order,
-        paymentResult,
-        customer: formData,
-        items: cartItems,
-        totals: cartTotals,
-        shippingCost,
-        totalAmount,
-        isMockOrder: orderResult.isMock || false
+      // E. Panggil API Internal Next.js
+      const response = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
       });
 
-      setOrderPlaced(true);
+      const result = await response.json();
 
-      // Clear cart after successful order
-      clearCart();
+      if (!response.ok) {
+        throw new Error(result.error || result.message || 'Failed to place order');
+      }
 
-      // Store order in localStorage for order confirmation page
-      const orderForStorage = {
-        wooOrderId: orderResult.orderId,
-        orderNumber: orderResult.orderNumber,
-        customer: formData,
-        items: cartItems,
-        totals: cartTotals,
-        shippingCost,
-        totalAmount,
-        paymentMethod: formData.paymentMethod,
-        paymentResult,
-        status: orderResult.status,
-        createdAt: new Date().toISOString()
-      };
+      console.log("✅ Order Created:", result);
 
-      localStorage.setItem('lastOrder', JSON.stringify(orderForStorage));
+      // F. Handle Success
+      if (result.success && result.payment && result.payment.paymentUrl) {
+        console.log("💳 Payment URL received:", result.payment.paymentUrl);
+
+        // Clear cart setelah order berhasil dibuat
+        clearCart();
+
+        // Set order data dan payment URL untuk DOKU modal
+        setOrderData({
+          orderId: result.order_id,
+          invoiceNumber: result.invoice_number
+        });
+
+        setPaymentUrl(result.payment.paymentUrl);
+        setShowDokuCheckout(true);
+
+      } else {
+        throw new Error("Invalid payment response received");
+      }
 
     } catch (error) {
-      console.error('WooCommerce order submission error:', error);
-      alert(`Order failed: ${error.message}. Please try again or contact customer service.`);
+      console.error("❌ Checkout Error:", error);
+      alert(`Checkout Failed: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (cartItems.length === 0 && !orderPlaced) {
+  // DOKU Checkout handlers
+  const handleDokuSuccess = (response) => {
+    console.log("✅ DOKU Payment Success:", response);
+    setOrderPlaced(true);
+    setOrderData(prev => ({
+      ...prev,
+      paymentCompleted: true,
+      paymentResponse: response
+    }));
+    // Redirect ke success page atau show success state
+    setTimeout(() => {
+      router.push('/checkout/finish?status=success&order_id=' + orderData.orderId);
+    }, 2000);
+  };
+
+  const handleDokuError = (error) => {
+    console.error("❌ DOKU Payment Error:", error);
+    alert(`Payment Failed: ${error.message || 'Payment could not be processed'}`);
+    setShowDokuCheckout(false);
+  };
+
+  const handleDokuClose = () => {
+    console.log("🔒 DOKU Checkout closed");
+    setShowDokuCheckout(false);
+    // Optionally show retry or return to checkout
+  };
+
+  // Tampilan Cart Kosong
+  if (cartReady && cartItems.length === 0 && !orderPlaced) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <ShoppingBag className="mx-auto text-gray-400 mb-4" size={64} />
           <h2 className="text-2xl font-light mb-2">Your cart is empty</h2>
-          <p className="text-gray-600 mb-6">Add some products to your cart before checkout</p>
           <button
             onClick={() => router.push('/')}
-            className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+            className="mt-4 px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
           >
             Continue Shopping
           </button>
@@ -158,6 +205,7 @@ export default function CheckoutPage() {
     );
   }
 
+  // Tampilan Sukses - Menunggu redirect ke DOKU
   if (orderPlaced) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -166,46 +214,48 @@ export default function CheckoutPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="text-center max-w-md mx-auto p-8"
         >
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-              </svg>
-            </motion.div>
-          </div>
+          <div className="w-20 h-20 border-4 border-gray-300 border-t-black rounded-full animate-spin mx-auto mb-6"></div>
 
-          <h1 className="text-3xl font-light mb-2">Order Placed Successfully!</h1>
-          <p className="text-gray-600 mb-4">Thank you for your purchase</p>
+          <h1 className="text-3xl font-light mb-4">
+            {orderData?.redirecting ? 'Redirecting to Payment...' : 'Order Created Successfully!'}
+          </h1>
 
-          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-gray-600 mb-1">Order Number</p>
-            <p className="font-medium text-lg">{orderData?.id}</p>
-            {orderData?.isMockOrder && (
-              <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded">
-                <p className="text-xs text-yellow-800">
-                  🧪 This is a test order (development mode)
-                </p>
-              </div>
-            )}
-          </div>
+          <p className="text-gray-600 mb-6">
+            {orderData?.redirecting
+              ? 'You will be redirected to the secure payment page in a moment...'
+              : 'Your order has been created successfully.'
+            }
+          </p>
 
-          <button
-            onClick={() => router.push('/')}
-            className="w-full px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            Continue Shopping
-          </button>
+          {orderData?.orderId && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <p className="text-sm text-gray-600 mb-1">Order Number</p>
+              <p className="font-medium text-lg">#{orderData.orderId}</p>
+              {orderData?.invoiceNumber && (
+                <>
+                  <p className="text-sm text-gray-600 mb-1 mt-2">Invoice Number</p>
+                  <p className="font-medium">{orderData.invoiceNumber}</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {orderData?.redirecting && (
+            <div className="text-sm text-gray-500">
+              If you are not redirected automatically,{' '}
+              <a href="#" className="text-black underline">
+                click here to continue
+              </a>
+            </div>
+          )}
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-4">
@@ -239,8 +289,19 @@ export default function CheckoutPage() {
           {/* Checkout Form */}
           <div className="lg:col-span-2">
             <CheckoutForm
-              onSubmit={handleOrderSubmit}
+              onSubmit={handleOrderSubmit} // PENTING: Form harus memanggil fungsi ini saat submit
               isLoading={isLoading}
+              cartItems={cartItems}
+              cartTotals={cartTotals}
+              shippingCost={shippingCost}
+              totalAmount={totalAmount}
+              // Opsional: Kirim data user yang login untuk auto-fill form
+              initialData={user ? {
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                phone: user.phone
+              } : null}
             />
           </div>
 
@@ -258,5 +319,16 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+
+      {/* DOKU Checkout Modal */}
+      <DokuCheckout
+        paymentUrl={paymentUrl}
+        isOpen={showDokuCheckout}
+        onClose={handleDokuClose}
+        onSuccess={handleDokuSuccess}
+        onError={handleDokuError}
+        isLoading={paymentLoading}  
+      />
+      </>
   );
 }

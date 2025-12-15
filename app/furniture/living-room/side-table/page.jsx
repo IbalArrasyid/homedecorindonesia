@@ -1,3 +1,4 @@
+
 import ProductsPage from "@/components/ProductsPage";
 import { getProducts } from "@/services/api";
 

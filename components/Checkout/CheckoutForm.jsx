@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { User, MapPin, Phone, CreditCard, Truck } from "lucide-react";
+import { User, MapPin, CreditCard, Truck } from "lucide-react";
 
-const CheckoutForm = ({ onSubmit, isLoading }) => {
+const CheckoutForm = ({ 
+  onSubmit, 
+  isLoading, 
+  cartItems, 
+  cartTotals, 
+  shippingCost, 
+  totalAmount,
+  initialData // 1. Menerima data user yang login
+}) => {
   const [formData, setFormData] = useState({
     // Contact Information
     firstName: '',
@@ -35,26 +43,38 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
     orderNotes: '',
 
     // Payment Method
-    paymentMethod: 'bank_transfer',
+    paymentMethod: 'doku', // Default ke Doku
+    paymentMethodType: 'BCA', // Default Type
 
-    // Shipping Method
-    shippingMethod: 'standard'
+    // Doku specific (opsional, disinkronkan dengan paymentMethodType)
+    dokuPaymentMethod: 'VIRTUAL_ACCOUNT',
+    dokuPaymentType: 'BCA',
   });
 
   const [errors, setErrors] = useState({});
+
+  // 2. Auto-fill Form jika User Login
+  useEffect(() => {
+    if (initialData) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: initialData.firstName || '',
+        lastName: initialData.lastName || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        // Jika user punya alamat tersimpan (misal dari profil), bisa di-map disini juga
+      }));
+    }
+  }, [initialData]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-
-    // Clear error for this field
+    // Clear error
     if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
+      setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
@@ -71,16 +91,10 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
   const handleShippingSameChange = (checked) => {
     setFormData(prev => ({
       ...prev,
-      shippingSameAsBilling: checked
+      shippingSameAsBilling: checked,
+      // Jika dicentang, salin billing ke shipping
+      shippingAddress: checked ? { ...prev.billingAddress } : prev.shippingAddress
     }));
-
-    if (checked) {
-      // Copy billing address to shipping
-      setFormData(prev => ({
-        ...prev,
-        shippingAddress: { ...prev.billingAddress }
-      }));
-    }
   };
 
   const validateForm = () => {
@@ -114,11 +128,42 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleDokuPaymentChange = (method, type) => {
+    setFormData(prev => ({
+      ...prev,
+      dokuPaymentMethod: method,
+      dokuPaymentType: type,
+      paymentMethod: 'doku',
+      paymentMethodType: type // Penting: Ini yang dikirim ke API
+    }));
+  };
+
+  const handlePaymentMethodChange = (method) => {
+    setFormData(prev => ({
+      ...prev,
+      paymentMethod: method,
+      // Reset type jika bukan doku, atau set default jika doku
+      paymentMethodType: method === 'doku' ? prev.dokuPaymentType || 'BCA' : ''
+    }));
+  };
+
+  // 3. Logic Submit Utama
   const handleSubmit = (e) => {
     e.preventDefault();
-
+    
+    // Validasi Form
     if (validateForm()) {
-      onSubmit(formData);
+      // Pastikan Shipping Address terisi benar sebelum kirim
+      const finalFormData = {
+        ...formData,
+        shippingAddress: formData.shippingSameAsBilling ? formData.billingAddress : formData.shippingAddress
+      };
+
+      // Panggil fungsi parent (CheckoutPage) untuk proses API
+      onSubmit(finalFormData);
+    } else {
+      // Scroll ke atas jika ada error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -137,79 +182,55 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                First Name *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
               <input
                 type="text"
                 value={formData.firstName}
                 onChange={(e) => handleInputChange('firstName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                  errors.firstName ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.firstName ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="John"
                 disabled={isLoading}
               />
-              {errors.firstName && (
-                <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>
-              )}
+              {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Last Name *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
               <input
                 type="text"
                 value={formData.lastName}
                 onChange={(e) => handleInputChange('lastName', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                  errors.lastName ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.lastName ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="Doe"
                 disabled={isLoading}
               />
-              {errors.lastName && (
-                <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>
-              )}
+              {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                  errors.email ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="john.doe@example.com"
                 disabled={isLoading}
               />
-              {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-              )}
+              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                  errors.phone ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="+62 812-3456-7890"
                 disabled={isLoading}
               />
-              {errors.phone && (
-                <p className="text-red-500 text-sm mt-1">{errors.phone}</p>
-              )}
+              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
             </div>
           </div>
         </div>
@@ -222,80 +243,56 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
           </h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Street Address *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Street Address *</label>
               <input
                 type="text"
                 value={formData.billingAddress.street}
                 onChange={(e) => handleAddressChange('billingAddress', 'street', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                  errors['billing.street'] ? 'border-red-500' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.street'] ? 'border-red-500' : 'border-gray-300'}`}
                 placeholder="123 Main Street"
                 disabled={isLoading}
               />
-              {errors['billing.street'] && (
-                <p className="text-red-500 text-sm mt-1">{errors['billing.street']}</p>
-              )}
+              {errors['billing.street'] && <p className="text-red-500 text-sm mt-1">{errors['billing.street']}</p>}
             </div>
 
             <div className="grid md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  City *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
                 <input
                   type="text"
                   value={formData.billingAddress.city}
                   onChange={(e) => handleAddressChange('billingAddress', 'city', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                    errors['billing.city'] ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.city'] ? 'border-red-500' : 'border-gray-300'}`}
                   placeholder="Jakarta"
                   disabled={isLoading}
                 />
-                {errors['billing.city'] && (
-                  <p className="text-red-500 text-sm mt-1">{errors['billing.city']}</p>
-                )}
+                {errors['billing.city'] && <p className="text-red-500 text-sm mt-1">{errors['billing.city']}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Province *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
                 <input
                   type="text"
                   value={formData.billingAddress.province}
                   onChange={(e) => handleAddressChange('billingAddress', 'province', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                    errors['billing.province'] ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.province'] ? 'border-red-500' : 'border-gray-300'}`}
                   placeholder="DKI Jakarta"
                   disabled={isLoading}
                 />
-                {errors['billing.province'] && (
-                  <p className="text-red-500 text-sm mt-1">{errors['billing.province']}</p>
-                )}
+                {errors['billing.province'] && <p className="text-red-500 text-sm mt-1">{errors['billing.province']}</p>}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Postal Code *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
                 <input
                   type="text"
                   value={formData.billingAddress.postalCode}
                   onChange={(e) => handleAddressChange('billingAddress', 'postalCode', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                    errors['billing.postalCode'] ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['billing.postalCode'] ? 'border-red-500' : 'border-gray-300'}`}
                   placeholder="12345"
                   disabled={isLoading}
                 />
-                {errors['billing.postalCode'] && (
-                  <p className="text-red-500 text-sm mt-1">{errors['billing.postalCode']}</p>
-                )}
+                {errors['billing.postalCode'] && <p className="text-red-500 text-sm mt-1">{errors['billing.postalCode']}</p>}
               </div>
             </div>
           </div>
@@ -308,7 +305,7 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
             <h2 className="text-lg font-medium">Shipping Address</h2>
           </div>
 
-          <label className="flex items-center gap-2 mb-4">
+          <label className="flex items-center gap-2 mb-4 cursor-pointer">
             <input
               type="checkbox"
               checked={formData.shippingSameAsBilling}
@@ -320,82 +317,34 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
           </label>
 
           {!formData.shippingSameAsBilling && (
-            <div className="space-y-4 animate-in">
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Street Address *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Street Address *</label>
                 <input
                   type="text"
                   value={formData.shippingAddress.street}
                   onChange={(e) => handleAddressChange('shippingAddress', 'street', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                    errors['shipping.street'] ? 'border-red-500' : 'border-gray-300'
-                  }`}
-                  placeholder="456 Shipping Lane"
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.street'] ? 'border-red-500' : 'border-gray-300'}`}
                   disabled={isLoading}
                 />
-                {errors['shipping.street'] && (
-                  <p className="text-red-500 text-sm mt-1">{errors['shipping.street']}</p>
-                )}
+                {errors['shipping.street'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.street']}</p>}
               </div>
 
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.shippingAddress.city}
-                    onChange={(e) => handleAddressChange('shippingAddress', 'city', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                      errors['shipping.city'] ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Jakarta"
-                    disabled={isLoading}
-                  />
-                  {errors['shipping.city'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['shipping.city']}</p>
-                  )}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                    <input type="text" value={formData.shippingAddress.city} onChange={(e) => handleAddressChange('shippingAddress', 'city', e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.city'] ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading}/>
+                    {errors['shipping.city'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.city']}</p>}
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Province *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.shippingAddress.province}
-                    onChange={(e) => handleAddressChange('shippingAddress', 'province', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                      errors['shipping.province'] ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="DKI Jakarta"
-                    disabled={isLoading}
-                  />
-                  {errors['shipping.province'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['shipping.province']}</p>
-                  )}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
+                    <input type="text" value={formData.shippingAddress.province} onChange={(e) => handleAddressChange('shippingAddress', 'province', e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.province'] ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading}/>
+                    {errors['shipping.province'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.province']}</p>}
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Postal Code *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.shippingAddress.postalCode}
-                    onChange={(e) => handleAddressChange('shippingAddress', 'postalCode', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${
-                      errors['shipping.postalCode'] ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="12345"
-                    disabled={isLoading}
-                  />
-                  {errors['shipping.postalCode'] && (
-                    <p className="text-red-500 text-sm mt-1">{errors['shipping.postalCode']}</p>
-                  )}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
+                    <input type="text" value={formData.shippingAddress.postalCode} onChange={(e) => handleAddressChange('shippingAddress', 'postalCode', e.target.value)} className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent ${errors['shipping.postalCode'] ? 'border-red-500' : 'border-gray-300'}`} disabled={isLoading}/>
+                    {errors['shipping.postalCode'] && <p className="text-red-500 text-sm mt-1">{errors['shipping.postalCode']}</p>}
                 </div>
               </div>
             </div>
@@ -408,62 +357,95 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
             <CreditCard size={20} />
             Payment Method
           </h2>
-          <div className="space-y-3">
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="bank_transfer"
-                checked={formData.paymentMethod === 'bank_transfer'}
-                onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                className="text-black focus:ring-black"
-                disabled={isLoading}
-              />
-              <div className="flex-1">
-                <div className="font-medium">Bank Transfer</div>
-                <div className="text-sm text-gray-500">Transfer directly to our bank account</div>
-              </div>
-            </label>
 
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="cod"
-                checked={formData.paymentMethod === 'cod'}
-                onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                className="text-black focus:ring-black"
-                disabled={isLoading}
-              />
-              <div className="flex-1">
-                <div className="font-medium">Cash on Delivery</div>
-                <div className="text-sm text-gray-500">Pay when you receive your order</div>
-              </div>
-            </label>
+          <div className="mb-6">
+            <div className="space-y-3">
+              <label className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${formData.paymentMethod === 'doku' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="doku"
+                  checked={formData.paymentMethod === 'doku'}
+                  onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                  className="text-blue-600 focus:ring-blue-600"
+                  disabled={isLoading}
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-blue-900">Secure Online Payment</div>
+                  <div className="text-sm text-blue-700">Virtual Account, E-Wallet, QR Code, Credit Card & More</div>
+                </div>
+                <div className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-medium">Recommended</div>
+              </label>
 
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="midtrans"
-                checked={formData.paymentMethod === 'midtrans'}
-                onChange={(e) => handleInputChange('paymentMethod', e.target.value)}
-                className="text-black focus:ring-black"
-                disabled={isLoading}
-              />
-              <div className="flex-1">
-                <div className="font-medium">Credit/Debit Card</div>
-                <div className="text-sm text-gray-500">Secure payment via Midtrans</div>
-              </div>
-            </label>
+              {formData.paymentMethod === 'doku' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="mt-4 pl-2 space-y-3"
+                >
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                    <select
+                      value={formData.dokuPaymentMethod}
+                      onChange={(e) => handleDokuPaymentChange(e.target.value, formData.dokuPaymentType)}
+                      disabled={isLoading}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    >
+                      <option value="VIRTUAL_ACCOUNT">Virtual Account</option>
+                      <option value="EWALLET">E-Wallet</option>
+                      <option value="QR_CODE">QR Code</option>
+                      <option value="CREDIT_CARD">Credit Card</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bank/Provider</label>
+                    <select
+                      value={formData.dokuPaymentType}
+                      onChange={(e) => handleDokuPaymentChange(formData.dokuPaymentMethod, e.target.value)}
+                      disabled={isLoading}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    >
+                      {formData.dokuPaymentMethod === 'VIRTUAL_ACCOUNT' && (
+                        <>
+                          <option value="BCA">BCA Virtual Account</option>
+                          <option value="BNI">BNI Virtual Account</option>
+                          <option value="BRI">BRI Virtual Account</option>
+                          <option value="MANDIRI">Mandiri Virtual Account</option>
+                        </>
+                      )}
+                      {formData.dokuPaymentMethod === 'EWALLET' && (
+                        <>
+                          <option value="OVO">OVO</option>
+                          <option value="DANA">DANA</option>
+                          <option value="GOPAY">GoPay</option>
+                          <option value="LINKAJA">LinkAja</option>
+                        </>
+                      )}
+                      {formData.dokuPaymentMethod === 'QR_CODE' && (
+                        <>
+                          <option value="QRIS">QRIS</option>
+                        </>
+                      )}
+                      {formData.dokuPaymentMethod === 'CREDIT_CARD' && (
+                        <>
+                          <option value="VISA">Visa</option>
+                          <option value="MASTERCARD">Mastercard</option>
+                          <option value="JCB">JCB</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Order Notes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Order Notes (Optional)
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Order Notes (Optional)</label>
           <textarea
             value={formData.orderNotes}
             onChange={(e) => handleInputChange('orderNotes', e.target.value)}
@@ -476,30 +458,23 @@ const CheckoutForm = ({ onSubmit, isLoading }) => {
 
         {/* Submit Button */}
         <div className="pt-4 border-t">
+          {/* Kita menggunakan tombol standard di sini agar form submit ter-trigger dengan benar */}
           <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-black text-white py-3 px-6 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
+             type="submit"
+             disabled={isLoading}
+             className="w-full bg-black text-white py-4 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Processing Order...
-              </>
-            ) : (
-              <>
-                Place Order
-                <motion.div
-                  initial={{ x: 0 }}
-                  animate={{ x: isLoading ? 0 : 4 }}
-                  transition={{ repeat: Infinity, repeatType: 'reverse', duration: 0.8 }}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </motion.div>
-              </>
-            )}
+             {isLoading ? (
+                 <>
+                    <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Processing Order...
+                 </>
+             ) : (
+                 <>
+                    Place Order & Pay {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(totalAmount)}
+                    <CreditCard size={18} />
+                 </>
+             )}
           </button>
         </div>
       </form>

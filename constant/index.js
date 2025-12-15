@@ -127,31 +127,31 @@ export const navlinks = [
       },
       {
         name: 'Home Office',
-        href: '/furniture-office',
+        href: '/furniture/home-office',
         hasDropdown: true,
         sublinks: [
           {
             name: 'Study Tables',
-            href: '/product-category/study-tables'
+            href: '/furniture/home-office/study-tables'
           },
           {
-            name: 'Study Chairs',
-            href: '/product-category/office-chairs'
+            name: 'Executive Chairs',
+            href: '/furniture/home-office/executive-chairs'
           },
           {
-            name: 'Bookcase',
-            href: '/product-category/furniture/bookcases'
+            name: 'Bookcases',
+            href: '/furniture/home-office/bookcases'
           }
         ]
       },
       {
         name: 'Accents',
-        href: '#',
+        href: 'furniture/accents',
         hasDropdown: true,
         sublinks: [
           {
-            name: 'Display Accent',
-            href: '/product-category/display-cabinets'
+            name: 'Display Cabinets',
+            href: '/furniture/accents/display-cabinets'
           }
         ]
       },
@@ -164,82 +164,82 @@ export const navlinks = [
     sublinks: [
       {
         name: 'Ceiling Light',
-        href: '/product-category/lighting/ceiling-light'
+        href: '/lighting/ceiling-light'
       },
       {
         name: 'Table Lamp',
-        href: '/product-category/lamp/table-lamp'
+        href: '/lighting/table-lamp'
       },
       {
         name: 'Floor Lamp',
-        href: '/product-category/lamp/floor-lamp'
+        href: '/lighting/floor-lamp'
       }
     ]
   },
   {
     name: 'Decoration',
-    href: '/home-decor',
+    href: '/decoration',
     hasDropdown: true,
     sublinks: [
       {
         name: 'Home Accents',
-        href: '#',
+        href: 'decoration/home-accents',
         hasDropdown: true,
         sublinks: [
           {
             name: 'Decorative Stool',
-            href: '/product-category/home-decor/decorative-stools'
+            href: 'decoration/home-accents/decorative-stools'
           },
           {
             name: 'Decor Arts & Scluptures',
-            href: '/product-category/home-decor/scluptures'
+            href: 'decoration/home-accents/decor-arts-scluptures'
           },
           {
             name: 'Vase & Ceramic Jars',
-            href: '/product-category/home-decor/vase-jar'
+            href: '/decoration/home-accents/vase-ceramic-jars'
           },
           {
             name: 'Photo Frames',
-            href: '/product-category/home-decor/photo-frames'
+            href: '/decoration/home-accents/photo-frames'
           },
           {
             name: 'Bowls & Trays',
-            href: '/product-category/bowls-trays'
+            href: '/decoration/home-accents/bowls-trays'
           },
           {
             name: 'Books & Bookends',
-            href: '/product-category/books-bookends'
+            href: '/decoration/home-accents/books-bookends'
           },
           {
             name: 'Candle Holders',
-            href: '/product-category/candle-holders'
+            href: '/decoration/home-accents/candle-holders'
           },
           {
             name: 'Flower Arrangement',
-            href: '/product-category/home-decor/flower-arrangement'
+            href: '/decoration/home-accents/flower-arrangement'
           },
           {
-            name: 'Other Accessories',
-            href: '/product-category/home-decor/other-accessories'
+            name: 'Decorative Objects',
+            href: '/decoration/home-accents/decorative-objects'
           }
         ]
       },
       {
         name: 'Wall Decor',
-        href: '#',
+        href: '/decoration/wall-decor',
         hasDropdown: true,
         sublinks: [
           {
             name: 'Wall Arts',
-            href: '/product-category/home-decor/wall-arts'
+            href: '/decoration/wall-decor/wall-arts'
           },
           {
             name: 'Mirror',
-            href: '/product-category/furniture/mirrors'
+            href: '/decoration/wall-decor/mirrors'
           },
           {
             name: 'Clocks',
-            href: '/product-category/clocks'
+            href: '/decoration/wall-decor/clocks'
           }
         ]
       }
@@ -247,35 +247,35 @@ export const navlinks = [
   },
   {
     name: 'Cushions',
-    href: '#',
+    href: '/cushions',
     hasDropdown: true,
     sublinks: [
       {
         name: 'Square Cushions',
-        href: '/product-category/home-decor/square-cushions'
+        href: '/cushions/square-cushions'
       },
       {
         name: 'Rectangle Cushions',
-        href: '/product-category/home-decor/rectangle-cushions'
+        href: '/cushions/rectangle-cushions'
       },
       {
         name: 'Round Cushions',
-        href: '/product-category/home-decor/round-cushions'
+        href: '/cushions/round-cushions'
       }
     ]
   },
   {
     name: 'Fabrics',
-    href: '#',
+    href: '/fabrics',
     hasDropdown: true,
     sublinks: [
       {
         name: 'Drapery Fabric',
-        href: '/product-category/draperyfabrics'
+        href: '/fabrics/drapery-fabrics'
       },
       {
         name: 'Promotional Fabric',
-        href: '/product-category/promotionalfabrics'
+        href: '/fabrics/promotional-fabrics'
       }
     ]
   },
@@ -290,19 +290,19 @@ export const navlinks = [
   {
     name: 'SALE',
     hasDropdown: true,
-    href: '#',
+    href: '/sale',
     sublinks: [
       {
         name: 'SALE COLLECTION',
-        href: '/product-category/sale'
+        href: '/sale/sale-collection'
       },
       {
         name: 'CLEARANCE SALE',
-        href: '/product-category/home-decor-furniture-sale30-70'
+        href: '/sale/clearance-sale'
       },
       {
         name: 'Allure',
-        href: '/product-category/allure'
+        href: '/sale/allure-sale'
       }
     ]
   }
