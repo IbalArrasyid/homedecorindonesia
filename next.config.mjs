@@ -2,7 +2,6 @@
 const nextConfig = {
   output: 'standalone', 
   
-  // TAMBAHKAN INI AGAR BUILD TIDAK GAGAL KARENA TANDA KUTIP
   eslint: {
     ignoreDuringBuilds: true,
   },
